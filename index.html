@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Simulador de Campo Magnético - Interactivo</title>
+    <style>
+        :root {
+            --bg-page: #2c3e50;
+            --panel-bg: #ecf0f1;
+            --text-dark: #2c3e50;
+            --accent-red: #e74c3c;
+            --accent-black: #222;
+            --copper: #c87a46;
+            --copper-dark: #8c5a2b;
+            --copper-light: #e6a06f;
+            --screen-bg: #0a0a0a;
+            --screen-text: #00ff00;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-page);
+            margin: 0;
+            padding: 0;
+            /* Permitir scroll en ambos ejes en móviles */
+            overflow: auto;
+            touch-action: pan-x pan-y; 
+            color: var(--text-dark);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Nombres en la esquina */
+        .names-watermark {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            color: rgba(255, 255, 255, 0.6);
+            font-family: monospace;
+            font-size: 10px;
+            z-index: 999999;
+            pointer-events: none;
+            letter-spacing: 0.5px;
+            background: rgba(0,0,0,0.5);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        /* --- BOTONES FLOTANTES --- */
+        .tutorial-btn, .reset-btn {
+            position: fixed;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            border: 3px solid #fff;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.2s;
+            touch-action: manipulation;
+        }
+
+        .tutorial-btn {
+            top: 15px;
+            right: 15px;
+            background: linear-gradient(to bottom, #3498db, #2980b9);
+            animation: pulse 2s infinite;
+        }
+
+        .reset-btn {
+            top: 15px;
+            left: 15px;
+            background: linear-gradient(to bottom, #e74c3c, #c0392b);
+        }
+
+        .tutorial-btn:hover, .reset-btn:hover { transform: scale(1.1); }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(52, 152, 219, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0); }
+        }
+
+        /* --- SISTEMA DE TUTORIAL --- */
+        #spotlight {
+            position: fixed;
+            border-radius: 8px;
+            border: 3px dashed #f1c40f;
+            box-shadow: 0 0 15px rgba(241, 196, 15, 0.8), inset 0 0 15px rgba(241, 196, 15, 0.4);
+            transition: all 0.3s ease;
+            pointer-events: none;
+            z-index: 9001;
+            display: none;
+            animation: spotlightPulse 1.5s infinite;
+        }
+
+        @keyframes spotlightPulse {
+            0% { border-color: #f1c40f; box-shadow: 0 0 10px rgba(241, 196, 15, 0.5); }
+            50% { border-color: #fff; box-shadow: 0 0 25px rgba(241, 196, 15, 1); }
+            100% { border-color: #f1c40f; box-shadow: 0 0 10px rgba(241, 196, 15, 0.5); }
+        }
+
+        #tutorialBox {
+            position: fixed;
+            background: rgba(255, 255, 255, 0.98);
+            color: #333;
+            padding: 15px;
+            border-radius: 10px;
+            width: 280px;
+            max-width: 90vw;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            z-index: 9002;
+            pointer-events: auto;
+            transition: all 0.3s ease;
+            display: none;
+            border-left: 5px solid #f1c40f;
+        }
+
+        #tutorialBox h3 {
+            margin: 0 0 8px 0;
+            color: #2c3e50;
+            font-size: 16px;
+        }
+
+        #tutorialBox p {
+            margin: 0 0 12px 0;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .tutorial-nav {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .tutorial-nav button {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            touch-action: manipulation;
+        }
+
+        .btn-primary { background: #3498db; color: white; }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-secondary { background: #ecf0f1; color: #333; border: 1px solid #bdc3c7; }
+        .btn-secondary:hover { background: #bdc3c7; }
+
+        .step-success {
+            background-color: #2ecc71 !important;
+            color: white !important;
+            border-left-color: #27ae60 !important;
+        }
+
+        /* --- ÁREA DE TRABAJO --- */
+        .workspace {
+            display: flex;
+            flex-wrap: nowrap; /* Siempre en línea horizontal */
+            gap: 20px;
+            padding: 70px 20px 20px 20px;
+            justify-content: flex-start;
+            align-items: center;
+            width: max-content;
+            min-width: 100vw;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        /* --- FUENTE DE ALIMENTACIÓN --- */
+        .power-supply {
+            background: linear-gradient(to bottom, #bdc3c7, #95a5a6);
+            border-radius: 10px;
+            padding: 15px;
+            width: 200px;
+            flex-shrink: 0;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            position: relative;
+            z-index: 10;
+            box-sizing: border-box;
+        }
+
+        .ps-brand {
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 10px;
+            color: #fff;
+            text-shadow: 1px 1px 2px #333;
+            font-size: 12px;
+        }
+
+        .ps-display {
+            background-color: var(--screen-bg);
+            color: #ff3333;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 22px;
+            text-align: right;
+            padding: 8px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border: 2px solid #555;
+            box-shadow: inset 0 0 10px rgba(255,0,0,0.3);
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .control-group label {
+            font-weight: bold;
+            font-size: 11px;
+            margin-bottom: 5px;
+            color: #333;
+            text-align: center;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .terminals {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 25px;
+            padding-bottom: 10px;
+        }
+
+        .terminal {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid #333;
+            position: relative;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        .terminal.red { background-color: var(--accent-red); }
+        .terminal.black { background-color: var(--accent-black); }
+        
+        .terminal-label {
+            position: absolute;
+            bottom: -18px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        /* --- ÁREA DE LA BOBINA Y SENSOR --- */
+        .coil-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            width: 600px;
+            height: 300px;
+            flex-shrink: 0;
+            z-index: 5;
+        }
+
+        .track {
+            position: absolute;
+            top: 150px;
+            width: 100%;
+            height: 4px;
+            background-color: rgba(127, 140, 141, 0.4);
+            border-radius: 2px;
+            z-index: 1;
+        }
+
+        .sensor-assembly {
+            position: absolute;
+            top: 150px;
+            left: 50%;
+            transform: translateX(0);
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .sensor-tip {
+            position: absolute;
+            left: 0;
+            top: -6px;
+            width: 14px;
+            height: 14px;
+            background-color: #00ff00;
+            border: 2px solid #008800;
+            cursor: grab;
+            z-index: 6;
+            pointer-events: auto;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+            touch-action: none;
+        }
+
+        .sensor-tip:active { cursor: grabbing; }
+
+        .sensor-rod {
+            position: absolute;
+            height: 10px;
+            background: #fff;
+            left: 10px;
+            top: -4px;
+            width: 300px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            border: 1px solid #999;
+            cursor: grab;
+            pointer-events: auto;
+            touch-action: none;
+            background-image: 
+                repeating-linear-gradient(90deg, #333 0px, #333 1px, transparent 1px, transparent 10px),
+                repeating-linear-gradient(90deg, #000 0px, #000 2px, transparent 2px, transparent 50px);
+            background-size: 100% 30%, 100% 50%;
+            background-position: bottom left;
+            background-repeat: repeat-x;
+        }
+        
+        .sensor-rod:active { cursor: grabbing; }
+
+        .ruler-labels {
+            position: absolute;
+            top: 12px;
+            left: 0; 
+            width: 300px;
+            height: 15px;
+            display: flex;
+            font-size: 10px;
+            font-family: monospace;
+            color: #fff;
+            pointer-events: none;
+            z-index: 7;
+        }
+        .ruler-label {
+            position: absolute;
+            transform: translateX(-50%);
+        }
+
+        .coil-wrapper {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        .coil-terminals {
+            position: absolute;
+            top: -25px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 10px;
+            box-sizing: border-box;
+            pointer-events: auto;
+        }
+
+        .coil-terminal {
+            width: 14px;
+            height: 20px;
+            background-color: #777;
+            border: 1px solid #333;
+            border-radius: 2px;
+            position: relative;
+            z-index: 15;
+        }
+        .coil-terminal.red { background-color: var(--accent-red); }
+        .coil-terminal.black { background-color: var(--accent-black); }
+
+        .coil-body {
+            height: 90px;
+            position: relative;
+            background-color: transparent;
+            border-top: 3px solid #333;
+            border-bottom: 3px solid #333;
+            border-radius: 50px; 
+            transition: width 0.1s ease;
+            z-index: 10;
+            box-shadow: inset 0 20px 30px -10px rgba(0,0,0,0.5), inset 0 -20px 30px -10px rgba(0,0,0,0.5);
+        }
+
+        .center-mark {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 1px;
+            border-left: 2px dashed rgba(255, 255, 255, 0.4);
+            z-index: 12;
+            pointer-events: none;
+        }
+
+        .distance-display {
+            position: absolute;
+            top: 20px;
+            background-color: #e74c3c;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-family: monospace;
+            font-size: 14px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 20;
+            border: 2px solid #c0392b;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            white-space: nowrap;
+        }
+
+        /* --- TELÁMETRO --- */
+        .tesla-meter {
+            background: linear-gradient(to bottom, #dcdde1, #f5f6fa);
+            border-radius: 10px;
+            padding: 15px;
+            width: 200px;
+            flex-shrink: 0;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            position: relative;
+            z-index: 10;
+            box-sizing: border-box;
+        }
+        
+        .tm-brand {
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 13px;
+        }
+
+        .tm-display {
+            background-color: var(--screen-bg);
+            color: var(--screen-text);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 28px;
+            text-align: right;
+            padding: 10px;
+            border-radius: 5px;
+            border: 2px solid #555;
+            box-shadow: inset 0 0 15px rgba(0,255,0,0.2);
+            margin-bottom: 10px;
+        }
+        
+        .tm-display span.unit {
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .tm-position {
+            background-color: #222;
+            color: #ffcc00;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13px;
+            text-align: center;
+            padding: 5px;
+            border-radius: 3px;
+            border: 1px solid #555;
+            margin-bottom: 10px;
+        }
+
+        /* --- CABLES (SVG) --- */
+        #cableSvg { 
+            position: absolute; 
+            top: 0; left: 0; 
+            width: 100%; height: 100%; 
+            pointer-events: none; 
+            z-index: 50; 
+        }
+        .cable-path { 
+            fill: none; 
+            stroke-width: 6; 
+            stroke-linecap: round; 
+            filter: drop-shadow(2px 4px 4px rgba(0,0,0,0.4)); 
+        }
+        #cableRed { stroke: var(--accent-red); }
+        #cableBlack { stroke: var(--accent-black); }
+
+        .plug {
+            position: absolute;
+            width: 16px;
+            height: 28px;
+            border-radius: 8px;
+            cursor: grab;
+            z-index: 60;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.4);
+            touch-action: none;
+            transform: translate(-50%, -50%);
+            /* Transición suave para cuando se conecta */
+            transition: left 0.1s ease, top 0.1s ease;
+        }
+        .plug:active { cursor: grabbing; }
+        .plug.red { background: linear-gradient(to bottom, #ff7675, #d63031); border: 2px solid #b33939; }
+        .plug.black { background: linear-gradient(to bottom, #636e72, #2d3436); border: 2px solid #1e272e; }
+
+        .data-label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #fff;
+            background: rgba(0,0,0,0.8);
+            padding: 4px 8px;
+            border-radius: 4px;
+            position: absolute;
+            top: 220px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            z-index: 20;
+        }
+
+        .x-axis-label {
+            position: absolute;
+            bottom: 10px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #bdc3c7;
+            font-family: monospace;
+            padding: 0 20px;
+            box-sizing: border-box;
+            z-index: 15;
+        }
+
+        /* Ajustes para pantallas grandes (computadora) */
+        @media (min-width: 800px) {
+            .workspace {
+                justify-content: center;
+                padding-top: 20px;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="names-watermark">
+        Juan J. Fontalvo, Laura A. Salamanca, Daniel E. Villarruel, Elkin D. Hernández
+    </div>
+
+    <button class="reset-btn" id="resetBtn">↻</button>
+    <button class="tutorial-btn" id="tutorialBtn">?</button>
+
+    <div id="spotlight"></div>
+
+    <div id="tutorialBox">
+        <h3 id="tutTitle">Paso 1</h3>
+        <p id="tutText">Texto de ejemplo</p>
+        <div class="tutorial-nav">
+            <button class="btn-secondary" id="tutSkip">Saltar</button>
+            <button class="btn-primary" id="tutNext">Siguiente</button>
+        </div>
+    </div>
+
+    <svg id="cableSvg">
+        <path id="cableRed" class="cable-path" d="M 0 0 L 0 0" />
+        <path id="cableBlack" class="cable-path" d="M 0 0 L 0 0" />
+    </svg>
+
+    <div class="workspace" id="workspace">
+        
+        <div class="power-supply" id="elPowerSupply">
+            <div class="ps-brand">FUENTE DE ALIMENTACIÓN</div>
+            <div class="ps-display" id="currentDisplay">0.0 A</div>
+            
+            <div class="control-group" id="elCurrentGroup">
+                <label>Corriente (I)</label>
+                <input type="range" id="currentSlider" min="0" max="20" step="0.5" value="0">
+            </div>
+            
+            <div class="terminals" id="elTerminals">
+                <div class="terminal red" id="psTermRed"><div class="terminal-label">+</div></div>
+                <div class="terminal black" id="psTermBlack"><div class="terminal-label">-</div></div>
+            </div>
+        </div>
+
+        <div class="coil-section" id="coilArea">
+            
+            <div class="distance-display" id="distanceDisplay">Distancia al centro: 0.0 cm</div>
+
+            <div class="track"></div>
+            
+            <div class="sensor-assembly" id="elSensorGroup">
+                <div class="sensor-tip" id="sensorTip"></div>
+                <div class="sensor-rod"></div>
+                <div class="ruler-labels" id="rulerLabels"></div>
+            </div>
+
+            <div class="coil-wrapper" id="elCoilGroup">
+                <div class="coil-terminals">
+                    <div class="coil-terminal red" id="coilTermRed"></div>
+                    <div class="coil-terminal black" id="coilTermBlack"></div>
+                </div>
+                <div class="coil-body" id="coilBody"></div>
+                <div class="center-mark"></div>
+            </div>
+
+            <div class="data-label" id="coilDataLabel">N = 30 | L = 15 cm</div>
+            
+            <div class="x-axis-label">
+                <span>-30 cm</span>
+                <span>0 cm (Centro)</span>
+                <span>+30 cm</span>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 15px; flex-shrink: 0;">
+            <div class="tesla-meter" id="elTeslaMeter">
+                <div class="tm-brand">TESLÁMETRO</div>
+                <div class="tm-display">
+                    <span id="teslaDisplay">0.00</span> <span class="unit">mT</span>
+                </div>
+                <div class="tm-position" id="tmPositionDisplay">x = 0.0 cm</div>
+                <div style="font-size: 10px; text-align: center; color: #666;">
+                    Sensor de Campo Magnético
+                </div>
+            </div>
+
+            <div class="power-supply" id="elBobbinConfig" style="width: 200px;">
+                <div class="ps-brand" style="font-size: 12px;">CONFIGURACIÓN BOBINA</div>
+                
+                <div class="control-group">
+                    <label>Número de Espiras (N): <span id="valN">30</span></label>
+                    <input type="range" id="turnsSlider" min="10" max="520" step="5" value="30">
+                </div>
+                
+                <div class="control-group">
+                    <label>Longitud (L): <span id="valL">15</span> cm</label>
+                    <input type="range" id="lengthSlider" min="5" max="40" step="1" value="15">
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="plug red" id="plugRed"></div>
+    <div class="plug black" id="plugBlack"></div>
+
+    <script>
+        const state = {
+            current: 0,
+            turns: 30,
+            length: 15,
+            sensorX: 0,
+            redConnected: false,
+            blackConnected: false
+        };
+
+        const mu0 = 4 * Math.PI * 1e-7;
+        const R = 0.02;
+        const PIXELS_PER_CM = 10; 
+
+        const currentSlider = document.getElementById('currentSlider');
+        const turnsSlider = document.getElementById('turnsSlider');
+        const lengthSlider = document.getElementById('lengthSlider');
+        const currentDisplay = document.getElementById('currentDisplay');
+        const teslaDisplay = document.getElementById('teslaDisplay');
+        const valN = document.getElementById('valN');
+        const valL = document.getElementById('valL');
+        const coilBody = document.getElementById('coilBody');
+        const coilDataLabel = document.getElementById('coilDataLabel');
+        const sensorAssembly = document.getElementById('elSensorGroup'); 
+        const sensorTip = document.getElementById('sensorTip');
+        const coilArea = document.getElementById('coilArea');
+        const rulerLabels = document.getElementById('rulerLabels');
+        const distanceDisplay = document.getElementById('distanceDisplay');
+        const tmPositionDisplay = document.getElementById('tmPositionDisplay');
+        const psTermRed = document.getElementById('psTermRed');
+        const psTermBlack = document.getElementById('psTermBlack');
+        const coilTermRed = document.getElementById('coilTermRed');
+        const coilTermBlack = document.getElementById('coilTermBlack');
+        const plugRed = document.getElementById('plugRed');
+        const plugBlack = document.getElementById('plugBlack');
+        const cableRed = document.getElementById('cableRed');
+        const cableBlack = document.getElementById('cableBlack');
+
+        // ==========================================
+        // BOTÓN DE REINICIO
+        // ==========================================
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            if (tutorialActive) endTutorial();
+
+            state.current = 0;
+            state.turns = 30;
+            state.length = 15;
+            state.sensorX = 0;
+            state.redConnected = false;
+            state.blackConnected = false;
+
+            currentSlider.value = 0;
+            currentDisplay.innerText = '0.0 A';
+            
+            turnsSlider.value = 30;
+            lengthSlider.value = 15;
+
+            const psR = getPos(psTermRed);
+            plugRed.style.left = (psR.x - 30) + 'px';
+            plugRed.style.top = (psR.y + 60) + 'px';
+            plugRed.style.opacity = '1';
+
+            const psB = getPos(psTermBlack);
+            plugBlack.style.left = (psB.x + 30) + 'px';
+            plugBlack.style.top = (psB.y + 60) + 'px';
+            plugBlack.style.opacity = '1';
+
+            updateCoilVisuals();
+            updateSensorPosition();
+            updateDisplay();
+            updateCablePaths();
+            
+            document.getElementById('workspace').scrollIntoView({ behavior: 'smooth' });
+        });
+
+        // ==========================================
+        // SISTEMA DE TUTORIAL
+        // ==========================================
+        const tutorialSteps = [
+            {
+                title: "Paso 1: Conecta el cable Rojo",
+                text: "Arrastra el enchufe rojo desde la fuente hasta el terminal rojo de la bobina.",
+                target: '#plugRed',
+                condition: () => state.redConnected,
+            },
+            {
+                title: "Paso 2: Conecta el cable Negro",
+                text: "Ahora arrastra el enchufe negro hasta el terminal negro para cerrar el circuito.",
+                target: '#plugBlack',
+                condition: () => state.blackConnected,
+            },
+            {
+                title: "Paso 3: Aumenta la Corriente",
+                text: "Desliza el control de corriente de la fuente para generar un campo magnético.",
+                target: '#elCurrentGroup',
+                condition: () => state.current > 0,
+            },
+            {
+                title: "Paso 4: Mueve el Sensor",
+                text: "Arrastra la varilla blanca o la punta verde. Mira cómo cambia el teslámetro.",
+                target: '#sensorTip',
+                condition: () => state.sensorX !== 0,
+            },
+            {
+                title: "Paso 5: Configura la Bobina",
+                text: "Cambia el número de espiras (N) y la longitud (L) para ver el efecto.",
+                target: '#elBobbinConfig',
+                condition: null, 
+            }
+        ];
+
+        let currentTutorialStep = 0;
+        let tutorialActive = false;
+        let isTransitioning = false;
+
+        const spotlight = document.getElementById('spotlight');
+        const tutBox = document.getElementById('tutorialBox');
+        const tutTitle = document.getElementById('tutTitle');
+        const tutText = document.getElementById('tutText');
+        const tutBtn = document.getElementById('tutNext');
+        const tutSkip = document.getElementById('tutSkip');
+
+        function startTutorial() {
+            currentTutorialStep = 0;
+            tutorialActive = true;
+            spotlight.style.display = 'block';
+            tutBox.style.display = 'block';
+            showTutorialStep();
+        }
+
+        function endTutorial() {
+            tutorialActive = false;
+            spotlight.style.display = 'none';
+            tutBox.style.display = 'none';
+        }
+
+        function showTutorialStep() {
+            if (currentTutorialStep >= tutorialSteps.length) {
+                endTutorial();
+                return;
+            }
+
+            const step = tutorialSteps[currentTutorialStep];
+            
+            tutTitle.innerText = step.title;
+            tutText.innerText = step.text;
+            tutBox.classList.remove('step-success');
+            
+            tutBtn.style.display = step.condition ? 'none' : 'block';
+            tutBtn.innerText = (currentTutorialStep === tutorialSteps.length - 1) ? "Finalizar" : "Siguiente";
+            
+            const targetEl = document.querySelector(step.target);
+            if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                setTimeout(() => positionTutorialElements(targetEl), 300);
+            }
+        }
+
+        function positionTutorialElements(targetEl) {
+            const rect = targetEl.getBoundingClientRect();
+            const padding = 10;
+
+            // Posicionar el recuadro amarillo (spotlight)
+            spotlight.style.width = (rect.width + padding * 2) + 'px';
+            spotlight.style.height = (rect.height + padding * 2) + 'px';
+            spotlight.style.left = (rect.left - padding) + 'px';
+            spotlight.style.top = (rect.top - padding) + 'px';
+
+            // Posicionar el cuadro de texto para que NO tape el elemento resaltado
+            const boxW = tutBox.offsetWidth || 280;
+            const boxH = tutBox.offsetHeight || 150;
+            const margin = 15;
+
+            let boxTop;
+            // Si el elemento está en la mitad superior de la pantalla, poner el texto abajo.
+            // Si está en la mitad inferior, poner el texto arriba.
+            if (rect.top < window.innerHeight / 2) {
+                boxTop = window.innerHeight - boxH - margin;
+            } else {
+                boxTop = margin;
+            }
+
+            // Centrar horizontalmente sin salirse de los bordes
+            let boxLeft = (window.innerWidth - boxW) / 2;
+            if (boxLeft < margin) boxLeft = margin;
+            if (boxLeft + boxW > window.innerWidth - margin) {
+                boxLeft = window.innerWidth - boxW - margin;
+            }
+
+            tutBox.style.top = boxTop + 'px';
+            tutBox.style.left = boxLeft + 'px';
+        }
+
+        function checkTutorialProgress() {
+            if (!tutorialActive || isTransitioning) return;
+            
+            const step = tutorialSteps[currentTutorialStep];
+            if (step && step.condition && step.condition()) {
+                isTransitioning = true;
+                tutBox.classList.add('step-success');
+                tutText.innerText = "¡Excelente! Avanzando...";
+
+                setTimeout(() => {
+                    currentTutorialStep++;
+                    isTransitioning = false;
+                    showTutorialStep();
+                }, 800);
+            }
+        }
+
+        tutBtn.addEventListener('click', () => {
+            if (isTransitioning) return;
+            currentTutorialStep++;
+            showTutorialStep();
+        });
+
+        tutSkip.addEventListener('click', endTutorial);
+        document.getElementById('tutorialBtn').addEventListener('click', startTutorial);
+
+        window.addEventListener('resize', () => {
+            if (tutorialActive) {
+                const step = tutorialSteps[currentTutorialStep];
+                if (step) {
+                    const targetEl = document.querySelector(step.target);
+                    if (targetEl) positionTutorialElements(targetEl);
+                }
+            }
+            updateCablePaths();
+            updateSensorPosition();
+        });
+
+        window.addEventListener('scroll', () => {
+            if (tutorialActive) {
+                const step = tutorialSteps[currentTutorialStep];
+                if (step) {
+                    const targetEl = document.querySelector(step.target);
+                    if (targetEl) positionTutorialElements(targetEl);
+                }
+            }
+            updateCablePaths();
+        });
+
+        // ==========================================
+        // FÍSICA Y LÓGICA
+        // ==========================================
+        function calculateB() {
+            if (!state.redConnected || !state.blackConnected || state.current === 0) return 0;
+            
+            const I = state.current;
+            const N = state.turns;
+            const L = state.length / 100;
+            const x = state.sensorX / 100;
+
+            const term1 = (x + L/2) / Math.sqrt(R*R + Math.pow(x + L/2, 2));
+            const term2 = (x - L/2) / Math.sqrt(R*R + Math.pow(x - L/2, 2));
+            
+            let B = (mu0 * N * I) / (2 * L) * (term1 - term2);
+            return B * 1000;
+        }
+
+        function updateDisplay() {
+            teslaDisplay.innerText = Math.abs(calculateB()).toFixed(2);
+            
+            let sign = state.sensorX > 0 ? '+' : '';
+            let distText = `x = ${sign}${state.sensorX.toFixed(1)} cm`;
+            distanceDisplay.innerText = `Distancia al centro: ${distText}`;
+            tmPositionDisplay.innerText = distText;
+
+            checkTutorialProgress();
+        }
+
+        function updateCoilVisuals() {
+            const visualWidth = state.length * PIXELS_PER_CM;
+            coilBody.style.width = visualWidth + 'px';
+
+            let gap = visualWidth / state.turns;
+            if (gap < 2) gap = 2; 
+
+            coilBody.style.backgroundImage = `repeating-linear-gradient(
+                90deg,
+                var(--copper) 0px,
+                var(--copper) 2px,
+                transparent 2px,
+                transparent ${gap}px
+            )`;
+
+            coilDataLabel.innerText = `N = ${state.turns} | L = ${state.length} cm`;
+            valN.innerText = state.turns;
+            valL.innerText = state.length;
+            
+            updateCablePaths();
+            updateDisplay();
+        }
+
+        function generateRulerLabels() {
+            rulerLabels.innerHTML = '';
+            for (let i = 0; i <= 25; i += 5) {
+                const label = document.createElement('span');
+                label.className = 'ruler-label';
+                label.innerText = i;
+                label.style.left = (i * PIXELS_PER_CM) + 'px';
+                rulerLabels.appendChild(label);
+            }
+        }
+
+        function updateSensorPosition() {
+            const offsetPixels = state.sensorX * PIXELS_PER_CM;
+            sensorAssembly.style.left = `calc(50% + ${offsetPixels}px)`;
+        }
+
+        // Obtener coordenadas absolutas (incluyendo scroll)
+        function getPos(el) {
+            const rect = el.getBoundingClientRect();
+            return { 
+                x: rect.left + rect.width/2 + window.scrollX, 
+                y: rect.top + rect.height/2 + window.scrollY 
+            };
+        }
+
+        // Obtener coordenadas relativas al viewport (para detectar soltar)
+        function getPosViewport(el) {
+            const rect = el.getBoundingClientRect();
+            return { x: rect.left + rect.width/2, y: rect.top + rect.height/2 };
+        }
+
+        function updateCablePaths() {
+            if (state.redConnected) {
+                const pTerm = getPos(coilTermRed);
+                plugRed.style.left = pTerm.x + 'px';
+                plugRed.style.top = pTerm.y + 'px';
+            }
+            if (state.blackConnected) {
+                const pTerm = getPos(coilTermBlack);
+                plugBlack.style.left = pTerm.x + 'px';
+                plugBlack.style.top = pTerm.y + 'px';
+            }
+
+            const pSourceRed = getPos(psTermRed);
+            const pPlugRed = getPos(plugRed);
+            
+            const pSourceBlack = getPos(psTermBlack);
+            const pPlugBlack = getPos(plugBlack);
+
+            const getPath = (start, end) => {
+                const ctrlX = (start.x + end.x) / 2;
+                const ctrlY = Math.max(start.y, end.y) + 60;
+                return `M ${start.x} ${start.y} Q ${ctrlX} ${ctrlY} ${end.x} ${end.y}`;
+            };
+
+            cableRed.setAttribute('d', getPath(pSourceRed, pPlugRed));
+            cableBlack.setAttribute('d', getPath(pSourceBlack, pPlugBlack));
+        }
+
+        function setupPlug(plug, targetTerminal, isRed) {
+            let isDragging = false;
+
+            plug.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                isDragging = true;
+                plug.setPointerCapture(e.pointerId);
+                plug.style.cursor = 'grabbing';
+                plug.style.transition = 'none'; // Quitar transición al arrastrar
+                if (isRed) state.redConnected = false;
+                else state.blackConnected = false;
+            });
+
+            plug.addEventListener('pointermove', (e) => {
+                if (!isDragging) return;
+                // Usar coords absolutas para que el enchufe siga el dedo exactamente
+                plug.style.left = (e.clientX + window.scrollX) + 'px';
+                plug.style.top = (e.clientY + window.scrollY) + 'px';
+                updateCablePaths();
+            });
+
+            plug.addEventListener('pointerup', (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                plug.style.cursor = 'grab';
+                plug.style.transition = 'left 0.1s ease, top 0.1s ease';
+
+                const targetPos = getPosViewport(targetTerminal);
+                const plugPos = getPosViewport(plug);
+                const dist = Math.hypot(targetPos.x - plugPos.x, targetPos.y - plugPos.y);
+
+                // Tolerancia de 60 píxeles (ideal para dedos)
+                if (dist < 60) {
+                    if (isRed) state.redConnected = true;
+                    else state.blackConnected = true;
+                    
+                    // Ajustar a la posición exacta del terminal
+                    const absTarget = getPos(targetTerminal);
+                    plug.style.left = absTarget.x + 'px';
+                    plug.style.top = absTarget.y + 'px';
+                    plug.style.opacity = '0.8';
+                } else {
+                    // El cable se queda donde el usuario lo soltó.
+                    // No se devuelve a la fuente para permitir conectar en varios pasos.
+                }
+                
+                updateCablePaths();
+                updateDisplay();
+            });
+            
+            // Manejar cancelación (ej. si el sistema interrumpe el toque)
+            plug.addEventListener('pointercancel', (e) => {
+                isDragging = false;
+                plug.style.cursor = 'grab';
+                plug.style.transition = 'left 0.1s ease, top 0.1s ease';
+            });
+        }
+
+        setupPlug(plugRed, coilTermRed, true);
+        setupPlug(plugBlack, coilTermBlack, false);
+
+        let isSensorDragging = false;
+
+        function startSensorDrag(e) {
+            e.preventDefault();
+            isSensorDragging = true;
+        }
+
+        sensorTip.addEventListener('pointerdown', startSensorDrag);
+        document.querySelector('.sensor-rod').addEventListener('pointerdown', startSensorDrag);
+
+        window.addEventListener('pointermove', (e) => {
+            if (!isSensorDragging) return;
+            
+            const areaRect = coilArea.getBoundingClientRect();
+            const areaCenterX = areaRect.left + areaRect.width / 2;
+            
+            let deltaX = e.clientX - areaCenterX;
+            let cmX = deltaX / PIXELS_PER_CM;
+            
+            if (cmX > 25) cmX = 25;
+            if (cmX < -25) cmX = -25;
+            
+            state.sensorX = cmX;
+            updateSensorPosition();
+            updateDisplay();
+        });
+
+        window.addEventListener('pointerup', () => {
+            isSensorDragging = false;
+        });
+        
+        window.addEventListener('pointercancel', () => {
+            isSensorDragging = false;
+        });
+
+        currentSlider.addEventListener('input', (e) => {
+            state.current = parseFloat(e.target.value);
+            currentDisplay.innerText = state.current.toFixed(1) + ' A';
+            updateDisplay();
+        });
+
+        turnsSlider.addEventListener('input', (e) => {
+            state.turns = parseInt(e.target.value);
+            updateCoilVisuals();
+        });
+
+        lengthSlider.addEventListener('input', (e) => {
+            state.length = parseInt(e.target.value);
+            updateCoilVisuals();
+        });
+
+        window.onload = () => {
+            setTimeout(() => {
+                const psR = getPos(psTermRed);
+                plugRed.style.left = (psR.x - 30) + 'px';
+                plugRed.style.top = (psR.y + 60) + 'px';
+
+                const psB = getPos(psTermBlack);
+                plugBlack.style.left = (psB.x + 30) + 'px';
+                plugBlack.style.top = (psB.y + 60) + 'px';
+
+                generateRulerLabels();
+                updateCoilVisuals();
+                updateSensorPosition();
+                updateCablePaths();
+                updateDisplay();
+            }, 100);
+        };
+
+    </script>
+</body>
+</html>
